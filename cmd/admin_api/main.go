@@ -175,7 +175,6 @@ func main() {
 		return nil
 	}
 
-	// TODO: Wire up to service layer for deletes
 	eventBus := bus.New(bus.Subscribers{subscriber})
 
 	// MARK: Service

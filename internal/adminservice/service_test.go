@@ -510,7 +510,7 @@ func TestGetEventsForUser(t *testing.T) {
 		{
 			name:       "PassingCase",
 			userId:     uuid.NewString(),
-			numEvents:  50, // TODO: Put back to 50
+			numEvents:  50,
 			errMessage: "",
 			limit:      50,
 			page:       1,
