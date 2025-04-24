@@ -1,0 +1,88 @@
+name: ci
+
+on:
+  pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - ".gitignore"
+  push:
+    branches:
+      - 'main'
+    paths-ignore:
+      - '**/*.md'
+      - ".gitignore"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      # Label used to access the service container
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: root
+          POSTGRES_DB: example
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - "5432:5432"
+      valkey:
+        image: valkey/valkey:8-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: fmt
+        run: make fmt
+
+      - name: vet
+        run: make vet
+
+      - name: unit test
+        run: make test/unit
+
+      - name: Create DB schema
+        run: psql -f sql/create_examples.sql
+        env:
+          PGPASSWORD: postgres
+          PGHOST: localhost
+          PGUSER: root
+          PGDATABASE: example
+
+      - name: integration test
+        run: make test/integration
+        env:
+          DB_HOST: localhost
+          DB_USER: root
+          DB_PASS: postgres
+          DB_NAME: example
+          CACHE_HOST: localhost:6379
+  build-image:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Check if the image builds cleanly
+      - name: build image
+        uses: docker/build-push-action@v6
+        env:
+          DOCKER_BUILD_SUMMARY: false
+          DOCKER_BUILD_RECORD_UPLOAD: false
+          DOCKER_BUILD_RECORD_RETENTION_DAYS: 0
+        with:
+          build-args: |
+            TARGET_APPLICATION=api
+            VERSION=${{ github.sha }}
+          push: false

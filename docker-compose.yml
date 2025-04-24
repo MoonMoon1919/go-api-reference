@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:17-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_USER: ${POSTGRES_USER:-root}
+      POSTGRES_DB: ${POSTGRES_DB:-example}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+  cache:
+    image: valkey/valkey:8-alpine
+    ports:
+      - "6379:6379"
+
+  api:
+    build:
+      args:
+        TARGET_APPLICATION: api
+        VERSION: local
+    environment:
+      DB_NAME: example
+      DB_HOST: db
+      DB_PASS: password
+      DB_USER: root
+      CACHE_HOST: cache:6379
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+      - cache
+
+  admin:
+    build:
+      args:
+        TARGET_APPLICATION: admin_api
+        VERSION: local
+    environment:
+      DB_NAME: example
+      DB_HOST: db
+      DB_PASS: password
+      DB_USER: root
+      CACHE_HOST: cache:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - db
+      - cache
+
+volumes:
+  db-data:
