@@ -76,6 +76,15 @@ This project is dependent on Postgres and ValKey. Both dependencies can be run i
 docker compose up db cache -d
 ```
 
+### Database
+
+Create the database schema and tables
+
+```bash
+psql -U root -h localhost -d example -f sql/create_examples.sql
+```
+
+
 #### User API
 
 Without Docker:
