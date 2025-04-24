@@ -129,8 +129,6 @@ Run the following command to run the smoke test (requires server to be running).
 go run scripts/api_smoke/main.go
 ```
 
-##
-
 ## Logging
 
 The application uses structured logging with `log/slog`, outputting JSON-formatted logs.
@@ -161,3 +159,6 @@ The server implementation includes:
 - API handler and service implementations for an administrative API
 - Event listeners for "user created" and "user deleted"
 
+## Contributing
+
+See [CONTRIBUTING](./CONTRIBUTING)
