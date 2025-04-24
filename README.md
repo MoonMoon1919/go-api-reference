@@ -170,4 +170,4 @@ The server implementation includes:
 
 ## Contributing
 
-See [CONTRIBUTING](./CONTRIBUTING)
+See [CONTRIBUTING](./CONTRIBUTING.md)
