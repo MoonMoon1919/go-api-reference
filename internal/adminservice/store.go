@@ -13,6 +13,7 @@ import (
 	"github.com/moonmoon1919/go-api-reference/pkg/events"
 	"github.com/moonmoon1919/go-api-reference/pkg/example"
 	"github.com/moonmoon1919/go-api-reference/pkg/users"
+	"github.com/valkey-io/valkey-go/valkeyaside"
 )
 
 const (
@@ -224,19 +225,39 @@ func (e *exampleMemoryStore) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-type exampleSQLRepository struct {
-	pool *pgxpool.Pool
+func serializer(val *example.Example) (string, error) {
+	b, err := json.Marshal(val)
+	return string(b), err
 }
 
-func NewExampleSQLRepository(pool *pgxpool.Pool) *exampleSQLRepository {
+func deserializer(s string) (*example.Example, error) {
+	var result example.Example
+	if err := json.Unmarshal([]byte(s), &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+type exampleSQLRepository struct {
+	pool        *pgxpool.Pool
+	cacheClient valkeyaside.CacheAsideClient
+}
+
+func NewExampleSQLRepository(pool *pgxpool.Pool, cacheClient valkeyaside.CacheAsideClient) *exampleSQLRepository {
 	return &exampleSQLRepository{
-		pool: pool,
+		pool:        pool,
+		cacheClient: cacheClient,
 	}
 }
 
+/*
+Retrieves a single example for an administrator
+
+Admins cannot see message content of "example" objects.
+*/
 func (e *exampleSQLRepository) Get(ctx context.Context, id string) (example.Example, error) {
 	var result example.Example
-	// Admins cannot see messages!
 	err := e.pool.QueryRow(ctx, "SELECT id, uid FROM examples WHERE id=$1", id).Scan(&result.Id, &result.UserId)
 
 	if err != nil {
@@ -274,6 +295,11 @@ func (e *exampleSQLRepository) GetForUser(ctx context.Context, userId string, li
 	return results, nil
 }
 
+/*
+Deletes an example on a users behalf
+
+Removes from cache so we don't serve stale cache records to users
+*/
 func (e *exampleSQLRepository) Delete(ctx context.Context, id string) error {
 	var i string
 	err := e.pool.QueryRow(ctx, "DELETE FROM examples WHERE id=$1 RETURNING id", id).Scan(&i)
@@ -285,6 +311,13 @@ func (e *exampleSQLRepository) Delete(ctx context.Context, id string) error {
 		default:
 			return err
 		}
+	}
+
+	// Delete from cache
+	err = e.cacheClient.Del(ctx, id)
+
+	if err != nil {
+		return nil
 	}
 
 	return nil

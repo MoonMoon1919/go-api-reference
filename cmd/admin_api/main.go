@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/valkey-io/valkey-go"
+	"github.com/valkey-io/valkey-go/valkeyaside"
 
 	"github.com/moonmoon1919/go-api-reference/internal/adminservice"
 	"github.com/moonmoon1919/go-api-reference/internal/auditservice"
@@ -134,7 +135,16 @@ func main() {
 	}
 
 	// MARK: Repository
-	// TODO: Wire up DB cache to delete items
+	dbCache, err := valkeyaside.NewClient(valkeyaside.ClientOption{
+		ClientOption: valkey.ClientOption{
+			InitAddress: []string{cfg.cache.Host.Must()},
+			SelectDB:    1,
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+
 	dbConfig, err := pgxpool.ParseConfig(cfg.database.ConnectionString())
 	if err != nil {
 		panic(err)
@@ -146,7 +156,7 @@ func main() {
 	}
 
 	defer dbpool.Close()
-	exampleRepo := adminservice.NewExampleSQLRepository(dbpool)
+	exampleRepo := adminservice.NewExampleSQLRepository(dbpool, dbCache)
 	userRepo := adminservice.NewUserSQLRepository(dbpool)
 	auditRepo := adminservice.NewAuditLogSQLRepository(dbpool)
 
@@ -164,13 +174,13 @@ func main() {
 
 	// MARK: Event bus
 	auditlogrepo := auditservice.NewSQLRepository(dbpool)
-	audotlogsvc := auditservice.Service{Store: auditlogrepo}
+	auditlogsvc := auditservice.Service{Store: auditlogrepo}
 
 	subscriber := func(e events.Event) error {
 		d, _ := e.String()
 		slog.LogAttrs(logContext, slog.LevelInfo, "EVENT_RECEIVED", slog.String("event", d))
 
-		audotlogsvc.Add(context.TODO(), e)
+		auditlogsvc.Add(context.TODO(), e)
 
 		return nil
 	}

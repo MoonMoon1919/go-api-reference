@@ -9,17 +9,21 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/moonmoon1919/go-api-reference/internal/cache"
 	"github.com/moonmoon1919/go-api-reference/internal/config"
 	"github.com/moonmoon1919/go-api-reference/internal/store"
 	"github.com/moonmoon1919/go-api-reference/pkg/events"
 	"github.com/moonmoon1919/go-api-reference/pkg/example"
 	"github.com/moonmoon1919/go-api-reference/pkg/users"
+	"github.com/valkey-io/valkey-go"
+	"github.com/valkey-io/valkey-go/valkeyaside"
 )
 
 var testType = os.Getenv("TEST_TYPE")
 
 type testConfig struct {
 	database store.Config
+	cache    cache.Config
 }
 
 func buildConfig() testConfig {
@@ -34,21 +38,34 @@ func buildConfig() testConfig {
 				config.NewDefaultValueSource("schemas"),
 			),
 		},
+		cache: cache.Config{
+			Host: config.NewEnvironmentSource("CACHE_HOST"),
+		},
 	}
 }
 
-func buildClients(cfg testConfig) (*pgxpool.Pool, error) {
+func buildClients(cfg testConfig) (*pgxpool.Pool, valkeyaside.CacheAsideClient, error) {
+	dbCache, err := valkeyaside.NewClient(valkeyaside.ClientOption{
+		ClientOption: valkey.ClientOption{
+			InitAddress: []string{cfg.cache.Host.Must()},
+			SelectDB:    1,
+		},
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
 	dbConfig, err := pgxpool.ParseConfig(cfg.database.ConnectionString())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	dbpool, err := pgxpool.NewWithConfig(context.Background(), dbConfig)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return dbpool, nil
+	return dbpool, dbCache, nil
 }
 
 // MARK: Users
@@ -70,7 +87,7 @@ func TestIntegrationAdminUserAdd(t *testing.T) {
 	}
 
 	cfg := buildConfig()
-	pool, err := buildClients(cfg)
+	pool, _, err := buildClients(cfg)
 	if err != nil {
 		t.Errorf("Unexpected error building clients %s", err.Error())
 	}
@@ -122,7 +139,7 @@ func TestIntegrationAdminUserGet(t *testing.T) {
 	}
 
 	cfg := buildConfig()
-	pool, err := buildClients(cfg)
+	pool, _, err := buildClients(cfg)
 	if err != nil {
 		t.Errorf("Unexpected error building clients %s", err.Error())
 	}
@@ -179,7 +196,7 @@ func TestIntegrationAdminUserList(t *testing.T) {
 	}
 
 	cfg := buildConfig()
-	pool, err := buildClients(cfg)
+	pool, _, err := buildClients(cfg)
 	if err != nil {
 		t.Errorf("Unexpected error building clients %s", err.Error())
 	}
@@ -241,7 +258,7 @@ func TestIntegrationAdminUserDelete(t *testing.T) {
 	}
 
 	cfg := buildConfig()
-	pool, err := buildClients(cfg)
+	pool, _, err := buildClients(cfg)
 	if err != nil {
 		t.Errorf("Unexpected error building clients %s", err.Error())
 	}
@@ -301,13 +318,13 @@ func TestIntegrationAdminExampleGet(t *testing.T) {
 	}
 
 	cfg := buildConfig()
-	pool, err := buildClients(cfg)
+	pool, cache, err := buildClients(cfg)
 	if err != nil {
 		t.Errorf("Unexpected error building clients %s", err.Error())
 	}
 	defer pool.Close()
 
-	repository := NewExampleSQLRepository(pool)
+	repository := NewExampleSQLRepository(pool, cache)
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -372,13 +389,13 @@ func TestIntegrationAdminExampleGetForUser(t *testing.T) {
 	}
 
 	cfg := buildConfig()
-	pool, err := buildClients(cfg)
+	pool, cache, err := buildClients(cfg)
 	if err != nil {
 		t.Errorf("Unexpected error building clients %s", err.Error())
 	}
 	defer pool.Close()
 
-	repository := NewExampleSQLRepository(pool)
+	repository := NewExampleSQLRepository(pool, cache)
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -443,13 +460,13 @@ func TestIntegrationAdminExampleDelete(t *testing.T) {
 	}
 
 	cfg := buildConfig()
-	pool, err := buildClients(cfg)
+	pool, cache, err := buildClients(cfg)
 	if err != nil {
 		t.Errorf("Unexpected error building clients %s", err.Error())
 	}
 	defer pool.Close()
 
-	repository := NewExampleSQLRepository(pool)
+	repository := NewExampleSQLRepository(pool, cache)
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -503,7 +520,7 @@ func TestIntegrationAdminAuditGetEventsForItem(t *testing.T) {
 	}{}
 
 	cfg := buildConfig()
-	pool, err := buildClients(cfg)
+	pool, _, err := buildClients(cfg)
 	if err != nil {
 		t.Errorf("Unexpected error building clients %s", err.Error())
 	}
@@ -599,7 +616,7 @@ func TestIntegrationAdminAuditGetEventsForUser(t *testing.T) {
 	}
 
 	cfg := buildConfig()
-	pool, err := buildClients(cfg)
+	pool, _, err := buildClients(cfg)
 	if err != nil {
 		t.Errorf("Unexpected error building clients %s", err.Error())
 	}
@@ -694,7 +711,7 @@ func TestIntegrationAdminAuditGetByEventAndUser(t *testing.T) {
 	}
 
 	cfg := buildConfig()
-	pool, err := buildClients(cfg)
+	pool, _, err := buildClients(cfg)
 	if err != nil {
 		t.Errorf("Unexpected error building clients %s", err.Error())
 	}
