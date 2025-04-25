@@ -16,10 +16,12 @@ import (
 
 const (
 	notFoundMsg = "NOT FOUND"
+	cacheErrMsg = "CACHE_ERROR"
 	errKey      = "ERR"
 )
 
 var notFoundError = errors.New("example not found")
+var cacheError = errors.New("error caching example")
 
 // MARK: Interface
 type Storer interface {
@@ -137,7 +139,6 @@ func (e *exampleSQLRepository) refreshCache(ctx context.Context, item *example.E
 		return err
 	}
 
-	// TODO: Make repo specific error here...
 	cacheVal, err := serializer(item)
 	if err != nil {
 		return err
@@ -180,7 +181,17 @@ func (e *exampleSQLRepository) Update(ctx context.Context, item example.Example)
 		}
 	}
 
-	e.refreshCache(ctx, &result)
+	err = e.refreshCache(ctx, &result)
+
+	if err != nil {
+		slog.LogAttrs(
+			ctx,
+			slog.LevelError,
+			cacheErrMsg,
+			slog.String(errKey, err.Error()),
+		)
+		return example.Nil(), cacheError
+	}
 
 	return result, nil
 }
@@ -191,7 +202,12 @@ func (e *exampleSQLRepository) Get(ctx context.Context, i string) (example.Examp
 		err = e.pool.QueryRow(ctx, "SELECT * FROM examples WHERE id=$1", i).Scan(&result.Id, &result.Message, &result.UserId)
 
 		if err != nil {
-			slog.LogAttrs(ctx, slog.LevelError, notFoundMsg, slog.String(errKey, err.Error()))
+			slog.LogAttrs(
+				ctx,
+				slog.LevelError,
+				notFoundMsg,
+				slog.String(errKey, err.Error()),
+			)
 			return nil, notFoundError
 		}
 

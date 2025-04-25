@@ -37,6 +37,7 @@ func (i InvalidMessageError) Error() string {
 
 var serviceError = errors.New("service layer error")
 var repositoryAddError = errors.New("error storing record")
+var repositoryUpdateError = errors.New("error updating record")
 var repositoryNotFoundError = errors.New("item not found")
 var RepositoryListError = errors.New("error listing items")
 var limitToLargeError = errors.New("maximum limit is 50")
@@ -143,7 +144,7 @@ func (e Service) Update(ctx context.Context, userId, id, message string) (exampl
 				slog.String(logKeyError, err.Error()),
 			)
 			// storedItem is example.Nil, no need to create an empty struct again
-			return storedItem, repositoryAddError
+			return storedItem, repositoryUpdateError
 		}
 	}
 
