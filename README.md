@@ -42,6 +42,7 @@ Open source code has been crucial in my professional development. I wanted to gi
 ### Prerequisites
 
 - Go 1.23 or higher
+- Docker (for running dependencies locally)
 - Make
 
 ### Development
@@ -84,7 +85,6 @@ Create the database schema and tables
 psql -U root -h localhost -d example -f sql/create_examples.sql
 ```
 
-
 #### User API
 
 Without Docker:
@@ -117,14 +117,14 @@ The server will start on port 8081.
 
 ### Unit
 
-Use the following commands to run the unit tests:
+Use the following command to run unit tests:
 ```bash
 make test/unit
 ```
 
 ### Integration
 
-Use the following commands to run the integration tests:
+Use the following command to run integration tests (requires postgres & valkey):
 ```bash
 make test/integration
 ```
@@ -133,7 +133,13 @@ make test/integration
 
 A simple smoke test for the API can be found in `scripts/api_smoke/main.go`.
 
-Run the following command to run the smoke test (requires server to be running).
+> [!NOTE]
+> Smoke tests require
+> 1. The server and dependencies to be running
+> 1. The test user to exist in the db. To create the test user see note in [running the application](#running-the-application).
+
+
+Run the following command to run smoke tests.
 ```bash
 go run scripts/api_smoke/main.go
 ```
